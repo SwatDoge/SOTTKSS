@@ -1,0 +1,53 @@
+obj client = {
+    time_ratio: 0,
+    last_time: 0
+};
+
+action update_time() {
+    if ((num) client.last_time + 60000 > GAME.TIME.now()) {
+        return;
+    }
+    client.last_time = GAME.TIME.now();
+    
+    str time = GAME.TIME.getReadable(GAME.TIME.now() + 7200000);
+    num lengthOf_time = lengthOf time;
+
+    str hours = "";
+    str minutes = "";
+
+    bool is_hour = false;
+    bool is_minute = false;
+
+    for (num i = 0; i < lengthOf_time; i++) {
+        if (time[i] == " " || time[i] == "m") {
+            
+        }
+        else if (time[i] == "d") {
+            is_hour = true;
+        }
+        else if (time[i] == "h") {
+            is_minute = true;
+        }
+        else {
+            if (is_hour && !is_minute) {
+                hours += time[i];
+            }
+            else if (is_minute && is_minute) {
+                minutes += time[i];
+            }
+        }
+    }
+
+    client.time_ratio = (((num) hours * 60) + (num) minutes) / 1440;
+    GAME.log(client.time_ratio);
+}
+
+public action start() {
+    client.last_time = GAME.TIME.now() - 60000;
+}
+
+
+
+public action update(num delta) {
+    update_time();
+}

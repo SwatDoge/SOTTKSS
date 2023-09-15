@@ -1,0 +1,35 @@
+obj client = {
+    obj player: {},
+    bool hasSpawned: false
+};
+
+# libs
+public action createRay(num pos_x, num pos_y, num pos_z, num rot_x, num rot_y, num limit, num precision, bool debug){
+    num degrees_x = Math.toDeg(rot_x);
+    num degrees_y = Math.toDeg(rot_y);
+    if (degrees_x < 0) {degrees_x = degrees_x + 360;};
+    if (degrees_y < 0) {degrees_y = degrees_y + 360;};
+    GAME.log(degrees_x);
+    GAME.log(degrees_y);
+}
+
+# custom events
+public action onspawn(){
+   client.player = GAME.PLAYERS.getSelf();
+}
+
+# events
+public action onKeyPress(str key){
+    if (key == "k") {
+        createRay(client.player.position.x, client.player.position.y + 2, client.player.position.z, client.player.rotation.x, client.player.rotation.y, 100, 2, true);
+    };
+}
+
+public action update(num delta) {
+   obj[] players = GAME.PLAYERS.list();
+
+    if (client.hasSpawned == false && lengthOf players > 0){
+        onspawn();
+        client.hasSpawned = true;
+    };
+}

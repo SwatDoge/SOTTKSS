@@ -1,0 +1,406 @@
+# Glboal objects
+obj client = {
+	#general
+	self: {},
+	screen: {},
+	players: obj[],
+	player_objects: obj[],
+	last_update: GAME.TIME.now(),
+	
+	#killcam
+	playback: false,
+	started_killcam: false,
+	playback_delta: 1,
+	game_speed: 1,
+	
+	#recording
+	player_history: obj[]
+};
+
+bool test = false;
+
+obj config = {
+	time_before_killcam: 100,
+	killcam_lasting: 4000,
+	killcam_aftercam: 1500,
+	killcam_overlay: {
+		bar_thickness: 250,
+		bar_color: "#3F3F3F",
+		bar_opacity: 0.8,
+		
+		milisecond_text_size: 50,
+		milisecond_text_color: "#c3c3c3",
+		
+		header_text_size: 70,
+		header_text_color: "#FFF",
+		header_text: "ROUND ENDING KILLCAM"
+	},
+	killcam_slowdown: num[][
+		num[3300, 1],
+		num[4000, 0.1],
+		num[4500, 0.6],
+		num[5000, 0.9]
+	],
+	hide_element_on_killcam: str[
+		"customGUIHolder",
+		"instructionsUpdateBG",
+		"gameUIHider",
+		"inGameUISurv",
+		"killReactHolder",
+		"mobileUI",
+		"faceitInGameAppContainer",
+		"chatUI"
+	],
+	player_dimensions: {
+        width: 2.5,
+        height: 12,
+        eye_height: 9.5,
+        arm_height: 9
+    }
+};
+
+# Casting functions
+obj action cast_change_object(obj change_object){
+	return {
+		name: change_object.name,
+		class: change_object.class,
+		delta: change_object.delta,
+		team: change_object.team,
+		
+		rotation: change_object.rotation,
+		position: change_object.position,
+		
+		onGround: change_object.onGround,
+		isShooting: change_object.isShooting,
+		isAiming: change_object.isAiming,
+		isJumping: change_object.isJumping,
+		isCrouching: change_object.isCrouching
+	};
+}
+
+obj action cast_player_object(obj change_object){
+	return {
+		id: change_object.id,
+		change_array: change_object.change_array
+	};
+}
+
+obj action cast_coords_object(obj coords_object){
+	return {
+		x: coords_object.x,
+		y: coords_object.y,
+		z: coords_object.z
+	};
+}
+
+obj action cast_radians_object(obj radians_object){
+	return {
+		x: radians_object.x,
+		y: radians_object.y
+	};
+}
+
+# Interpolate casts
+obj action interpolate_cartesians(obj position_1, obj position_2, num ratio){
+	return {
+		x: Math.lerp(position_1.x, position_2.x, ratio),
+		y: Math.lerp(position_1.y, position_2.y, ratio),
+		z: Math.lerp(position_1.z, position_2.z, ratio)
+	};
+}
+
+# Regular functions
+
+# Toggle uiBase
+action uibase_visible(bool enabled){
+	str[] affected_children = (str[]) config.hide_element_on_killcam;
+	
+	for(num i = 0; i < lengthOf affected_children; i++)	{
+		GAME.UI.updateDIV(affected_children[i], "display",  enabled ? "" : "none");
+	}
+}
+
+# Convert ticks to a string that displays in minutes.
+str action ticks_to_minutes_string(num miliseconds){
+	num timer_ms = Math.trunc((miliseconds % 1000) / 100);
+	num timer_s = Math.floor(miliseconds / 1000);
+	num timer_m = Math.floor(timer_s / 60);
+
+	str string_s = fill_numbers(timer_s % 60);
+	str string_m = fill_numbers(timer_m % 60);
+
+	return string_m + ":" + string_s + "." + toStr timer_ms;
+}
+
+# Convert numbers under 10 without a 0 value to one with. 1 -> 01.
+str action fill_numbers(num number){
+	str str_number = toStr number;
+	
+	if (number < 10){
+		str_number = "0" + str_number;
+	}
+	
+	return str_number;
+}
+
+#clones 2d arrays without creating a reference.
+num[][] action clone_2d_array(num[][] array){
+    num[][] new_array = num[][];
+    if(lengthOf array > 0){
+        for(num i = 0; i < lengthOf array; i++){
+            num[] new_inner_array = num[];
+            for(num j = 0; j < lengthOf array[i]; j++){
+                addTo new_inner_array array[i][j];
+            }
+            addTo new_array new_inner_array;
+        }    
+    }
+    return new_array;
+}
+
+# Convert array of linear shit to an output.
+num action linear_array_to_outcome(num value, num[][] array){
+	num[] highest_lower_value = num[0, 1];
+	num[] highest_upper_value = num[0, 1];
+	
+	for (num index = 0; index < lengthOf array; index++){
+		num[] line_value = array[index];
+		if (line_value[0] > highest_upper_value[0]){
+			highest_upper_value = line_value;
+		}
+	}
+	
+	if (highest_upper_value[0] < value){
+		return 1;
+	}
+	
+	for (num index = 0; index < lengthOf array; index++){
+		num[] line_value = array[index];
+		if (highest_lower_value[0] < line_value[0] && value > line_value[0]){
+			highest_lower_value = line_value;
+		}
+		if (highest_upper_value[0] > line_value[0] && value < line_value[0]){
+			highest_upper_value = line_value;
+		}
+	}
+	
+	num ratio = (value - highest_lower_value[0]) / (highest_upper_value[0] - highest_lower_value[0]);
+	num ratio_to_value = Math.lerp(highest_lower_value[1], highest_upper_value[1], ratio);
+	
+	return Math.roundDecimal(ratio_to_value, 1);
+}
+
+# Generate the overlay for the killcam.
+action generate_killcam_overlay(num miliseconds){	
+	obj screen = (obj) client.screen;
+	obj killcam = (obj) config.killcam_overlay;
+	str display_miliseconds = ticks_to_minutes_string(miliseconds);
+	
+	#Bars
+	GAME.OVERLAY.drawRect(0, 0, (num) screen.width, (num) killcam.bar_thickness, 0, (str) killcam.bar_color, (num) killcam.bar_opacity, false);
+	GAME.OVERLAY.drawRect(0, (num) screen.height - (num) killcam.bar_thickness, (num) screen.width, (num) killcam.bar_thickness, 0, (str) killcam.bar_color, (num) killcam.bar_opacity, false);
+
+	#Countdown
+	num milisecond_text_width = GAME.OVERLAY.measureText((num) killcam.milisecond_text_size, display_miliseconds);
+	num end_round_text_width = GAME.OVERLAY.measureText((num) killcam.header_text_size, (str) killcam.header_text);
+	GAME.OVERLAY.drawText(display_miliseconds, ((num) screen.width / 2) - (milisecond_text_width / 2), 200, 0, (num) killcam.milisecond_text_size, "left", (str) killcam.milisecond_text_color, 1);
+	GAME.OVERLAY.drawText((str) killcam.header_text, ((num) screen.width / 2) - (end_round_text_width / 2), 100, 0, (num) killcam.header_text_size, "left", (str) killcam.header_text_color, 1);
+}
+
+# Store player change objects.
+action update_player_history(num delta, num fixed_delta, obj inputs, str id){	
+	obj player = GAME.PLAYERS.findByID(id);
+	bool exists = false;
+
+	obj change_object = cast_change_object({
+		name: player.username,
+		class: player.classIndex,
+		delta: fixed_delta,
+		team: player.team,
+		
+		rotation: cast_radians_object((obj) player.rotation),
+		position: cast_coords_object((obj) player.position),
+		
+		
+		onGround: player.onGround,
+		isCrouching: player.isCrouching,
+		isShooting: inputs.lMouse,
+		isAiming: inputs.rMouse,
+		isJumping: inputs.jump
+	});
+
+	obj player_object = cast_player_object({
+		id: player.id,
+		change_array: obj[change_object]
+	});
+
+	for (num player_history_index = 0; player_history_index < lengthOf (obj[]) client.player_history; player_history_index++){
+		if ((str) player.id == (str) client.player_history[player_history_index].id){
+			addTo (obj[]) client.player_history[player_history_index].change_array change_object;
+			exists = true;
+			
+			num delta_cap = 0;
+ 			num top_index = lengthOf (obj[]) client.player_history[player_history_index].change_array;
+			
+ 			for (num change_index = top_index - 1; change_index > 0; change_index--){
+				if (delta_cap < (num) config.killcam_lasting + (num) config.killcam_aftercam){
+					delta_cap += (num) client.player_history[player_history_index].change_array[change_index].delta;
+				}
+				else {
+ 					remove client.player_history[player_history_index].change_array[change_index];
+ 				}
+ 			}
+			break;
+		}
+	}
+
+ 	if (!exists){
+ 		addTo (obj[]) client.player_history player_object;
+ 	}
+
+	if (test){
+		test = false;
+		GAME.log(client.player_history);
+	}
+}
+
+# Convert Radians to cartesian coordinates
+obj action radians_to_cartesian(obj radians, num radius){
+	num half_pi = Math.PI / 2;
+
+	#radians
+	num theta = -(num) radians.x + half_pi;
+	num phi = (num) radians.y - half_pi;
+
+	#cartesian coordinates
+	num dot_x = ((num) radians.x) + radius * Math.sin(phi) * Math.cos(theta);
+	num dot_z = ((num) radians.z) + radius * Math.sin(phi) * Math.sin(theta);
+	num dot_y = ((num) radians.y) + radius * Math.cos(phi);
+
+	return {
+		x: dot_x, 
+		y: dot_y, 
+		z: dot_z
+	};
+}
+
+# Render players
+action render_killcam_players(obj[] player_history, num playback_delta){
+	
+	# Update player objects
+	for (num player_index = 0; player_index < lengthOf player_history; player_index++){
+		num change_delta = 0;
+		obj last_change = {};
+		obj current_change = {};
+		for (num change_index = 0; change_index < lengthOf (obj[]) player_history[player_index].change_array; change_index++){
+			
+			if (change_delta <= playback_delta){
+				last_change = cast_change_object((obj) player_history[player_index].change_array[change_index]);
+				change_delta += (num) player_history[player_index].change_array[change_index].delta;
+			}
+			else {
+				#addTo (obj[]) client.player_objects GAME.SCENE.addCube("", "#FF00FF", 0, 10, 0, 10, 10, 10);
+				obj camera_lookat = radians_to_cartesian((obj)last_change.rotation, 512);
+				GAME.CAMERA.lookAt(camera_lookat.x, camera_lookat.y, camera_lookat.z);
+	
+				
+				GAME.CAMERA.move(last_change.position.x, (num) last_change.position.y + (num) config.player_dimensions.eye_height, last_change.position.z);
+				change_delta += (num) player_history[player_index].change_array[change_index].delta;
+				break;
+			}
+		}
+	}
+}
+
+# Custom hooks
+
+# When the killcam starts
+action on_killcam_start(){
+	for (num i = 0; i < lengthOf client.players; i++){
+		client.players[i].visible = false;
+	}
+
+	uibase_visible(false);
+	client.playback = true;
+	client.playback_delta = 1;
+	GAME.CAMERA.detach();
+	GAME.INPUTS.disableDefault();
+}
+
+# When the killcam ends
+action on_killcam_end(){
+	
+	for (num i = 0; i < lengthOf client.players; i++){
+		client.players[i].visible = true;
+	}
+	
+	client.playback = false;
+	uibase_visible(true);
+	client.started_killcam = false;
+
+	GAME.CAMERA.rotation.x = 0;
+	GAME.CAMERA.rotation.y = 0;
+	GAME.CAMERA.rotation.z = 0;
+	GAME.CAMERA.attach();
+	GAME.INPUTS.enableDefault();
+}
+
+# While the killcam is going
+action while_killcam(num delta){
+	client.game_speed = linear_array_to_outcome((num) client.playback_delta, clone_2d_array((num[][]) config.killcam_slowdown));
+	(num) client.playback_delta += Math.round(delta * (num) client.game_speed);
+
+	if ((num) client.playback_delta > (num) config.time_before_killcam){
+		GAME.OVERLAY.clear();
+	
+		num miliseconds = (((num) config.time_before_killcam + (num) config.killcam_lasting)) - (num) client.playback_delta;
+		if (miliseconds < 0){
+			miliseconds = 0;
+		}
+	
+		# Render players
+		render_killcam_players((obj[]) client.player_history, (num) client.playback_delta);
+
+		# Render overlay
+		generate_killcam_overlay(miliseconds);
+	}
+
+	# Killcam stop
+	if ((num) client.playback_delta > ((num) config.time_before_killcam + (num) config.killcam_lasting + (num) config.killcam_aftercam)){
+		on_killcam_end();
+	}
+}
+
+# Krunker hooks
+public action onPlayerDeath(str id, str killerID){
+	client.current_killer = GAME.PLAYERS.findByID(killerID);
+}
+
+public action render(num delta){
+	if (!!client.self){
+		client.self = GAME.PLAYERS.getSelf();
+	}
+	client.players = GAME.PLAYERS.list();
+	client.screen = GAME.OVERLAY.getSize();
+
+	if ((bool) client.started_killcam){
+		if (!(bool) client.playback){
+			on_killcam_start();
+		}
+		while_killcam(GAME.TIME.now() - (num) client.last_update);
+	}
+
+	client.last_update = GAME.TIME.now();
+}
+
+public action onPlayerUpdate(str id, num delta, static obj inputs){
+	if (!!client.self){
+		client.self = GAME.PLAYERS.getSelf();
+	}
+	update_player_history(delta, GAME.TIME.now() - (num) client.last_update, inputs, id);
+}
+
+public action onKeyPress(str key, num code){
+	client.started_killcam = code == 80 || (bool) client.started_killcam;
+	test = code == 79 || test;
+}

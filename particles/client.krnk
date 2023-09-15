@@ -1,0 +1,440 @@
+obj client = {
+	player: {},
+	particles: obj[],
+	id: 0
+};
+
+obj config = {
+	player: {
+		width: 6.5,
+		height: 11
+	},
+	particle_textures: obj[
+		{id: 0, aid: "27989",  name: "color yellow", 		transparent: false},
+		{id: 1, aid: "27991",  name: "color green", 		transparent: false},
+		{id: 2, aid: "27992",  name: "color aqua",			transparent: false},
+		{id: 3, aid: "27993",  name: "color light blue", 	transparent: false},
+		{id: 4, aid: "27994",  name: "color blue", 			transparent: false},
+		{id: 5, aid: "27995",  name: "color purple", 		transparent: false},
+		{id: 6, aid: "27996",  name: "color pink", 			transparent: false},
+		{id: 7, aid: "27997",  name: "color red", 			transparent: false},
+		{id: 8, aid: "27998",  name: "color gray", 			transparent: false},
+		{id: 9, aid: "28000",  name: "color white", 		transparent: false},
+		{id: 10, aid: "28001", name: "color black", 		transparent: false},
+		{id: 11, aid: "28135", name: "balloon yellow", 		transparent: true},
+		{id: 12, aid: "28136", name: "balloon green", 		transparent: true},
+		{id: 13, aid: "28137", name: "balloon aqua", 		transparent: true},
+		{id: 14, aid: "28138", name: "balloon light blue", 	transparent: true},
+		{id: 15, aid: "28139", name: "balloon blue", 		transparent: true},
+		{id: 16, aid: "28140", name: "balloon purple", 		transparent: true},
+		{id: 17, aid: "28141", name: "balloon pink", 		transparent: true},
+		{id: 18, aid: "28142", name: "balloon red", 		transparent: true},
+		{id: 19, aid: "28143", name: "balloon gray", 		transparent: true},
+		{id: 20, aid: "28144", name: "balloon white", 		transparent: true},
+		{id: 21, aid: "28145", name: "balloon black", 		transparent: true}
+	],
+	hitboxes: obj[
+		{pos_x: 37,  pos_y: 0,   pos_z: 0,   width: 10,  height: 1,   length: 10},
+		{pos_x: 54,  pos_y: 0,   pos_z: 0,   width: 8,   height: 92,  length: 100},
+		{pos_x: 1,   pos_y: 0,   pos_z: 47,  width: 130, height: 92,  length: 9},
+		{pos_x: 59,  pos_y: 0,   pos_z: 57,  width: 31,  height: 57,  length: 14},
+		{pos_x: 93,  pos_y: 0,   pos_z: -79, width: 8,   height: 34,  length: 40},
+		{pos_x: -52, pos_y: 0,   pos_z: 0,   width: 8,   height: 92,  length: 100},
+		{pos_x: -2,  pos_y: 19,  pos_z: 31,  width: 17,  height: 15,  length: 9},
+		{pos_x: -2,  pos_y: 53,  pos_z: -2,  width: 50,  height: 22,  length: 9},
+		{pos_x: 0,   pos_y: 92,  pos_z: 0,   width: 116, height: 10,  length: 100},
+		{pos_x: 14,  pos_y: 22,  pos_z: -32, width: 50,  height: 22,  length: 9},
+		{pos_x: -26, pos_y: 0,   pos_z: -54, width: 8,   height: 102, length: 8},
+		{pos_x: -27, pos_y: 0,   pos_z: -58, width: 2,   height: 102, length: 4},
+		{pos_x: -2,  pos_y: 56,  pos_z: -73, width: 17,  height: 15,  length: 9},
+		{pos_x: 1,   pos_y: 17,  pos_z: -47, width: 130, height: 92,  length: 9},
+		{pos_x: -26, pos_y: -10, pos_z: 0,   width: 8,   height: 20,  length: 30},
+		{pos_x: -64, pos_y: -3,  pos_z: -63, width: 59,  height: 10,  length: 101},
+		{pos_x: 40,  pos_y: -10, pos_z: -26, width: 160, height: 10,  length: 150}
+	]
+};
+
+num action random(num min, num max){
+	return UTILS.randFloat(min, max);
+}
+
+obj action particle_object(obj config){
+	return {
+		behaviour: {									#Overrides force and thus energy. A constant force to a certain direction, like gravity.
+			gravity: {
+				x: 0,
+				y: 0,
+				z: 0
+			},								
+			force: {									#Direction the particle moves in. Gravity would be negative y force for instance. It gets affected by energy.
+				x: 1, 
+				y: 0, 
+				z: 0
+			},		
+			energy: {									#Energy of a direction. Energy depletes and slowly lowers force over time (if positive value).
+				x: 1, 
+				y: 0, 
+				z: 0
+			},		
+			collision: {
+				collision: true,						#When off, particles will keep moving thru surfaces.
+				clipping: false							#Decides wether the particles center (true) or the particles bottom (false) is on the ground.
+				#2d collision
+			},
+			player_collision: true,
+			player_collision_strength: 0.3
+		},
+		decay: {
+			decay: true,								#Enable decay (despawning) of particles.
+			min_decay_height: -1,						#At what y value the particle will automatically despawn.
+			start_decay_on_collision: true,				#Start decay once particle comes in contact with a surface.
+			start_decay_on_stop: false,					#Start decay once particle stops moving entirely.
+			decay_time: 1000,							#Total amount of time a particle can exists in miliseconds. Excludes start_decay_on_collision and start_decay_on_stop
+			decay_cooldown: 10000,						#Time it takes for an item to decay after an interaction, such as start_decay_on_collision and start_decay_on_stop.
+			transitions: {
+				#fadeout decay
+			}
+		},
+		properties: {
+			texture_id: num[0],							#Colors of particles.
+			size: 1 									#Size of particles.
+		},
+		performance: {
+			# frame offload amount
+			# frame offload scaling
+			# subsectioning
+			# stack merging
+			# frame based amount
+			# decay amplifier
+		}
+	};
+}
+
+#custom functions
+action clean_particles(){
+	for(num i = lengthOf client.particles; i > 0; i--){
+		client.particles[i - 1].sprite.delete();
+		remove client.particles[i - 1];
+	}
+}
+
+action remove_particle(obj particle){
+	for(num i = 0; i < lengthOf client.particles; i++){
+		if ((str) client.particles[i].id == (str) particle.id){
+			particle.sprite.delete();
+			remove client.particles[i];
+			break;
+		}
+	}
+}
+
+action particles(num pos_x, num pos_y, num pos_z, obj setup) {
+	obj particle_setup = setup;
+	bool transparent = false;
+	
+	#particles.properties.particle_textures (tested)
+	str asset_id = "28112";
+	num texture_id = UTILS.randInt(0, lengthOf particle_setup.properties.texture_id - 1);
+
+	for(num h = 0; h < lengthOf config.particle_textures; h++){
+		if ((num) config.particle_textures[h].id == (num) particle_setup.properties.texture_id[texture_id]){
+			asset_id = (str) config.particle_textures[h].aid;
+			transparent = (bool) config.particle_textures[h].transparent;
+			break;
+		}
+	}
+
+	addTo (obj[]) client.particles {
+		sprite: GAME.SCENE.addSprite(asset_id, "#FFF", pos_x, pos_y, pos_z, particle_setup.properties.size, 0, particle_setup.properties.size, {forceTransparency: transparent}),
+		config: particle_setup,
+		energy_total: {
+			x: setup.behaviour.energy.x,
+			y: setup.behaviour.energy.y,
+			z: setup.behaviour.energy.z
+		},
+		collided: false,
+		stopped: false,
+		decay: -1,
+		id: client.id
+	};
+
+	(num) client.id++;
+}
+
+#default functions
+
+public action start(){
+	GAME.log("No issues found");
+}
+
+public action update(num delta) {
+	if (!notEmpty (obj) client.player) {
+		client.player = GAME.PLAYERS.getSelf();
+	} else {
+		#loaded
+		if (lengthOf client.particles > 0){
+			#loop thru all particle objects.
+			for(num i = 0; i < lengthOf client.particles; i++){
+				obj particle = (obj) client.particles[i];
+				
+				#PARTICLE OFFSETS (force = energy / original energy * force + gravity)
+				
+				# config.behaviour.energy (tested)
+				num particle_energy_x = 1;
+				num particle_energy_y = 1;
+				num particle_energy_z = 1;
+					
+				if ((num) particle.energy_total.x != 0){
+					particle_energy_x = (num) particle.config.behaviour.energy.x / (num) particle.energy_total.x;
+				}
+					
+				if ((num) particle.energy_total.y != 0){
+					particle_energy_y = (num) particle.config.behaviour.energy.y / (num) particle.energy_total.y;
+				}
+					
+				if ((num) particle.energy_total.z != 0){
+					particle_energy_z = (num) particle.config.behaviour.energy.z / (num) particle.energy_total.z;
+				}
+				
+				# config.behaviour.force (tested)
+				num force_x = ((num) particle.config.behaviour.force.x * particle_energy_x) + (num) particle.config.behaviour.gravity.x;
+				num force_y = ((num) particle.config.behaviour.force.y * particle_energy_y) + (num) particle.config.behaviour.gravity.y;
+				num force_z = ((num) particle.config.behaviour.force.z * particle_energy_z) + (num) particle.config.behaviour.gravity.z;	
+				
+				# behaviour.player_collision (tested)
+				if ((bool) particle.config.behaviour.player_collision){
+					num particle_player_distance = UTILS.getDist3D(client.player.position.x, client.player.position.y, client.player.position.z, particle.sprite.position.x, particle.sprite.position.y, particle.sprite.position.z);
+					num particle_player_direction = UTILS.getDir2D(client.player.position.x, client.player.position.z, particle.sprite.position.x, particle.sprite.position.z);
+					if ((num) particle_player_distance <= (num) config.player.width) {
+						# behaviour.player_collision_strength (tested)
+						force_x += (num) particle.config.behaviour.player_collision_strength * Math.cos(particle_player_direction);
+						force_z += (num) particle.config.behaviour.player_collision_strength * Math.sin(particle_player_direction);
+						particle.stopped = false;
+					}
+				}
+
+				#behaviour.collision.collision (tested)
+				if ((bool) particle.config.behaviour.collision.collision && (num) particle.sprite.position.y > (num) particle.config.decay.min_decay_height){
+					#loop thru all hitboxes.
+					for(num h = 0; h < lengthOf config.hitboxes; h++){
+						obj hitbox = (obj) config.hitboxes[h];
+						obj p_pos = (obj) particle.sprite.position;
+						num offset = (num) particle.config.properties.size / 2;
+						num clipping = 0;
+						
+						#behaviour.collision.clipping (tested)
+						if (!(bool) particle.config.behaviour.collision.clipping){
+							clipping = offset;
+						}
+						
+						
+						if (!(bool) particle.stopped){
+							#X Collides
+							if (
+								#if coming from left
+								((force_x > 0 && (num) p_pos.x - force_x - offset < (num) hitbox.pos_x + ((num) hitbox.width / 2) && (num) p_pos.x - force_x - offset > (num) hitbox.pos_x - ((num) hitbox.width / 2)) ||
+								#if coming from right
+								(force_x < 0 && (num) p_pos.x + -force_x + offset < (num) hitbox.pos_x + ((num) hitbox.width / 2) && (num) p_pos.x + -force_x + offset > (num) hitbox.pos_x - ((num) hitbox.width / 2))) &&
+								#matches on y axis
+								(((num) hitbox.pos_y + (num) hitbox.height > (num) p_pos.y && (num) hitbox.pos_y < (num) p_pos.y) && 
+								#matches on z axis
+								((num) hitbox.pos_z + ((num) hitbox.length / 2) > (num) p_pos.z && (num) hitbox.pos_z - ((num) hitbox.length / 2) < (num) p_pos.z))){
+
+								if (force_x < 0){
+									# ceiling
+									force_x = (num) particle.config.behaviour.gravity.x > 0 ? (num) particle.config.behaviour.gravity.x : 0;
+								} else {
+									# floor
+									force_x = (num) particle.config.behaviour.gravity.x < 0 ? (num) particle.config.behaviour.gravity.x : 0;
+								}
+
+								particle.collided = true;
+								particle.config.behaviour.force.x = 0;
+								particle.config.behaviour.energy.x = 0;
+							}
+
+							#Z Collides
+							if (
+								#if coming from left
+								((force_z > 0 && (num) p_pos.z - force_z - offset < (num) hitbox.pos_z + ((num) hitbox.length / 2) && (num) p_pos.z - force_z - offset > (num) hitbox.pos_z - ((num) hitbox.length / 2)) ||
+								#if coming from right
+								(force_z < 0 && (num) p_pos.z + -force_z + offset < (num) hitbox.pos_z + ((num) hitbox.length / 2) && (num) p_pos.z + -force_z + offset > (num) hitbox.pos_z - ((num) hitbox.length / 2))) &&
+								#matches on y axis
+								(((num) hitbox.pos_y + (num) hitbox.height > (num) p_pos.y && (num) hitbox.pos_y < (num) p_pos.y) && 
+								#matches on z axis
+								((num) hitbox.pos_x + ((num) hitbox.width / 2) > (num) p_pos.x && (num) hitbox.pos_x - ((num) hitbox.width / 2) < (num) p_pos.x))){
+
+								if (force_z < 0){
+									# ceiling
+									force_z = (num) particle.config.behaviour.gravity.z > 0 ? (num) particle.config.behaviour.gravity.z : 0;
+								} else {
+									# floor
+									force_z = (num) particle.config.behaviour.gravity.z < 0 ? (num) particle.config.behaviour.gravity.z : 0;
+								}
+
+
+								particle.collided = true;
+								particle.config.behaviour.force.z = 0;
+								particle.config.behaviour.energy.z = 0;
+							}
+
+							#Y Collides
+							if (
+								#if coming from above
+								((force_y > 0 && (num) p_pos.y - force_y - clipping < (num) hitbox.pos_y + (num) hitbox.height && (num) p_pos.y - force_y - clipping > (num) hitbox.pos_y) || 
+								#if coming from below
+								(force_y < 0 && (num) p_pos.y + -force_y + clipping < (num) hitbox.pos_y + (num) hitbox.height && (num) p_pos.y + -force_y + clipping > (num) hitbox.pos_y)) &&
+								#matches on x axis
+								(((num) hitbox.pos_x + ((num) hitbox.width / 2) > (num) p_pos.x && (num) hitbox.pos_x - ((num) hitbox.width / 2) < (num) p_pos.x) && 
+								#matches on z axis
+								((num) hitbox.pos_z + ((num) hitbox.length / 2) > (num) p_pos.z && (num) hitbox.pos_z - ((num) hitbox.length / 2) < (num) p_pos.z))){
+
+								if (force_y < 0){
+									# ceiling
+									force_y = (num) particle.config.behaviour.gravity.y > 0 ? (num) particle.config.behaviour.gravity.y : 0;
+								} else {
+									# floor
+									force_y = (num) particle.config.behaviour.gravity.y < 0 ? (num) particle.config.behaviour.gravity.y : 0;
+								}
+
+								particle.collided = true;
+								particle.config.behaviour.force.y = 0;
+								particle.config.behaviour.energy.y = 0;
+							}
+
+							if (!particle.stopped && force_x == 0 && force_y == 0 && force_z == 0){
+								particle.stopped = true;
+							}
+						}
+					}
+				}
+				
+		
+				#BEHAVIOUR
+				if (!(bool) particle.stopped){					
+					(num) particle.sprite.position.x -= force_x;
+					(num) particle.sprite.position.y -= force_y;
+					(num) particle.sprite.position.z -= force_z;
+				}
+				
+				# Energy (tested)
+
+				#ENERGY
+				if ((num) particle.config.behaviour.energy.x > 0){
+					(num) particle.config.behaviour.energy.x--;
+				}
+				else if ((num) particle.config.behaviour.energy.x < 0){
+					(num) particle.config.behaviour.energy.x++;
+				}
+				
+				if ((num) particle.config.behaviour.energy.y > 0){
+					(num) particle.config.behaviour.energy.y--;
+				}
+				else if ((num) particle.config.behaviour.energy.y < 0){
+					(num) particle.config.behaviour.energy.y++;
+				}
+				
+				if ((num) particle.config.behaviour.energy.z > 0){
+					(num) particle.config.behaviour.energy.z--;
+				}
+				else if ((num) particle.config.behaviour.energy.z < 0){
+					(num) particle.config.behaviour.energy.z++;
+				}
+				
+				#DECAY
+				#decay.decay (done)
+				if ((bool) particle.config.decay.decay){
+					#increment decay
+					#decay.start_decay_on_collision (done) / decay.start_decay_on_top (done)
+					if (((bool) particle.config.decay.start_decay_on_collision && (bool) particle.collided) || ((bool) particle.config.decay.start_decay_on_stop && (bool) particle.stopped)){
+						if ((num) particle.decay == -1){
+							particle.decay = (num) particle.config.decay.decay_time;
+						} 
+						else if ((num) particle.decay > 0){
+							if ((num) particle.decay - delta > 0){
+								(num) particle.decay -= delta;
+							} 
+							else {
+								particle.decay = 0;
+							}
+						} 
+						else if ((num) particle.decay == 0){
+							remove_particle(particle);
+						}
+					}
+				
+					#particle.decay_cooldown (todo)
+					if ((num) particle.config.decay.decay_cooldown > 0){
+						(num) particle.config.decay.decay_cooldown -= delta;
+					} 
+					else {
+						remove_particle(particle);
+					}
+				
+					#decay.min_decay_height (done)
+					if ((num) particle.sprite.position.y <= (num) particle.config.decay.min_decay_height) {
+						remove_particle(particle);
+					}
+				}
+			}
+		}
+	}
+}
+
+#Custom
+#Radius | Distance explosion particle travel.
+#Center offset | How far away from the explosion center the particles start.
+#Density | Amount of particles.
+
+#Setup | particle object. (function will override some settings)
+action explode(num x, num y, num z, num radius, num center_offset, num density, num speed_amp, obj config){
+	
+	for(num phi = 0; phi < Math.PI2; phi += Math.PI / density){
+		for(num theta = 0; theta < Math.PI; theta += (Math.PI / density) * 2){
+			num _x = Math.cos(theta) * Math.sin(phi);
+			num _y = Math.cos(phi);
+			num _z = Math.sin(theta) * Math.sin(phi);
+
+			obj setup = particle_object(config);
+
+			setup.properties.texture_id = num[11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+			setup.properties.size = 7.5;
+
+			setup.behaviour.gravity.y = 0.2;
+
+ 			(num) setup.behaviour.force.x += -_x * speed_amp;
+ 			(num) setup.behaviour.force.y += -_y * speed_amp;
+ 			(num) setup.behaviour.force.z += -_z * speed_amp;
+
+			(num) setup.behaviour.energy.x += radius;
+ 			(num) setup.behaviour.energy.y += radius;
+ 			(num) setup.behaviour.energy.z += radius;
+
+			particles(x + (_x * center_offset), y + (_y * center_offset), z + (_z * center_offset), setup);
+		}
+	}
+}
+
+public action onKeyPress(str key, num code){
+	if (key == "l"){
+		clean_particles();
+	}
+
+	if (key == "p"){
+		num stopped = 0;
+		num going = 0;
+		for(num i = 0; i < lengthOf client.particles; i++){
+			if ((bool) client.particles[i].stopped){
+				stopped++;
+			} else {
+				going++;
+			}
+		}
+		GAME.log("stopped", stopped);
+		GAME.log("going", going);
+	}
+
+	if (key == "j"){
+		explode((num) client.player.position.x, (num) client.player.position.y + 10, (num) client.player.position.z, 50, 3, 31, 4, {});
+	}
+}

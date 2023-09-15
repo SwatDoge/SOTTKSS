@@ -1,0 +1,84 @@
+obj config = {
+    menu_key_code: 18
+};
+
+obj client = {
+	players: obj[],
+    menu: {
+        open_next_tick: false
+    }
+};
+
+# Player utils
+num action player_index_by_id(obj[] player_array, str player_id) {
+	
+	num lengthof_playerarray = lengthOf player_array;
+	for (num i = 0; i < lengthof_playerarray; i++){
+		if ((str) player_array[i].id == player_id){
+			return i;
+		}
+	}
+	return -1;
+}
+
+obj action get_self(obj[] player_array){
+	num lengthof_playerarray = lengthOf player_array;
+	for (num i = 0; i < lengthof_playerarray; i++){
+		if ((bool) player_array[i].isYou){
+			return player_array[i];
+		}
+	}
+	return {};
+}
+
+# Functions
+action menu_view(){
+	 GAME.UI.addDIV("header_menu", true, "display: grid; grid-template-columns: max-content 1fr max-content; margin-top: 25px; gap: 15px;", "menuWindow");
+        GAME.UI.addImage("39430", "brand_icon", true, "width: 75px;", "header_menu");
+
+        GAME.UI.addDIV("staff_logo_name", true, "font-size: 35px; align-items: center; display: inline-grid;", "header_menu");
+        GAME.UI.updateDIVText("staff_logo_name", "SOTT Staff Menu");
+
+		GAME.UI.addImage("41160", "config_icon", true, "width: 75px;", "header_menu");
+
+	GAME.UI.addDIV("player_menu", true, "margin-top: 25px;", "menuWindow");
+
+
+		num lengthOf_players = lengthOf client.players;
+		for (num i = 0; i < lengthOf_players; i++) {
+			GAME.UI.addDIV("selection_player_" + (str) i, true, "text-overflow:ellipsis;", "player_menu");
+			GAME.UI.updateDIVText("selection_player_" + (str) i, client.players[i].username);
+		}
+}
+
+
+# Official hooks
+public action onDIVClicked(str id) {
+	GAME.log(id);
+}
+
+public action onKeyPress(str key, num code) {
+    if (code == (num) config.menu_key_code){
+        client.menu.open_next_tick = true;
+    }
+}
+
+public action update(num delta){
+    if ((bool) client.menu.open_next_tick && GAME.UI.getProp("windowHolder", "display") != "none"){
+        client.menu.open_next_tick = false;
+        GAME.UI.updateDIVText("menuWindow", "");
+        menu_view();
+    }
+}
+
+public action onNetworkMessage(str id, obj data) {
+	if (id == "user_join") {
+		obj player = GAME.PLAYERS.findByID(id);
+		addTo (obj[]) client.players player;
+	}
+	
+	if (id == "user_left") {
+		num player_index = player_index_by_id((obj[]) client.players, (str) data.pid);
+		remove client.players[player_index];
+	}
+}

@@ -1,0 +1,137 @@
+obj[] documents = ;
+
+obj[] anchors = obj[];
+
+obj SCREEN = GAME.UI.getSize();
+
+str action replace_all(str string, str to_replace, str replace_with) {
+    while(UTILS.replaceText(string, to_replace, replace_with) != string) {
+        string = UTILS.replaceText(string, to_replace, replace_with);
+    }
+    return string;
+}
+
+str action styleobject_to_inline(obj style_object) {
+    str inline = "";
+    for (obj x in style_object) {
+        str key = replace_all((str) x.key, "_20", "-");
+        str value = replace_all((str) x.value, "_20", "-");
+    
+        inline += key + ":" + value + ";";
+    }
+
+    return inline;
+}
+
+obj action cast_element(obj element) {
+	return {
+		type: element.type,
+		id: element.id,
+		parent: element.parent,
+		style: element.style,
+		data: element.data
+	};
+}
+
+action render_dom() {
+	GAME.UI.updateDIVText("SOTT_CANVAS", "");
+	str text = "";
+	str space = "";
+	num lengthOf_documents = lengthOf documents;
+	
+	for (num y = 0; y < lengthOf_documents; y++) {
+		if ((bool) documents[y].shown) {
+			GAME.setTitle(documents[y].title);
+			for (num i = 0; i < lengthOf documents[y].data.content; i++) {	
+				str element_id = "";
+				obj dom_element = cast_element((obj) documents[y].data.content[i]);
+
+				if (hasProp dom_element.style) {
+					GAME.UI.addDIV(dom_element.id, true, styleobject_to_inline((obj) dom_element.style), dom_element.parent);
+				}
+
+				if ((str) dom_element.type == "anchor") {
+					addTo anchors {
+						refer: dom_element.data.refer, 
+						anchor: dom_element.id
+					};
+				}
+
+				if ((str) dom_element.type == "text") {
+					if (lengthOf text > 0) {
+						space = text[lengthOf text - 1] == " " ? "" : " ";
+					}
+
+					GAME.UI.updateDIVText(dom_element.id, space + (str) dom_element.data.text);
+
+					if ((str) dom_element.data.text == "") {
+						GAME.UI.updateDIV(dom_element.id, "display", "none");
+					}
+					else {
+						text = (str) dom_element.data.text;
+					}
+				}
+			}
+		}
+	}
+}
+
+public action onDIVClicked(str id) {
+	
+	num lengthOf_documents = lengthOf documents;
+	num lengthOf_anchors = lengthOf anchors;
+	
+	# get get anchor resource
+	for (num i = 0; i < lengthOf_anchors; i++) {
+		if ((str) anchors[i].anchor == id) {
+			
+			# show refer dependent from id
+			for (num y = 0; y < lengthOf_documents; y++) {
+				documents[y].shown = (str) documents[y].id == (str) anchors[i].refer;
+			}
+			break;
+		}
+	}
+	
+	render_dom();
+}
+
+public action start() {
+    GAME.UI.addDIV("SOTT_CANVAS", true, "position: absolute; height: 100%; width: 100%; overflow: auto; z-index: 2147483646; background-color: white; overflow: auto;");
+
+	GAME.MODS.load("https://krunker-user-assets.nyc3.cdn.digitaloceanspaces.com/md47232/mod.zip");	
+
+    GAME.UI.updateDIV("uiBase", "transform", "");
+    GAME.UI.updateDIV("uiBase", "width", "");
+    GAME.UI.updateDIV("uiBase", "height", "");
+
+    GAME.DEFAULT.disablePrediction();
+    GAME.DEFAULT.disablePlayerBehaviour();
+    GAME.DEFAULT.disable3D();
+    GAME.INPUTS.disableDefault();
+    GAME.PLAYERS.disableMeshes();
+
+    GAME.SETTINGS.set("ambientVolume", "0");
+    GAME.SETTINGS.set("voiceVolume", "0");
+    GAME.SETTINGS.set("uiVolume", "0");
+    GAME.SETTINGS.set("skinVolume", "0");
+    GAME.SETTINGS.set("playerVolume", "0");
+    GAME.SETTINGS.set("dialogueVolume", "0");
+
+    GAME.UI.updateDIV("gameUI", "textAlign", "left");
+    GAME.UI.hideCrosshair();
+
+	render_dom();
+}
+
+public action render(num delta) {
+	GAME.UI.updateDIV("customGUIHolder", "display", "block");
+	
+    obj SCREENFRAME = GAME.UI.getSize();
+    if ((num) SCREEN.width != (num) SCREENFRAME.width || (num) SCREEN.height != (num) SCREENFRAME.height) {
+       SCREEN = SCREENFRAME;
+       GAME.UI.updateDIV("uiBase", "transform", "");
+       GAME.UI.updateDIV("uiBase", "width", "");
+       GAME.UI.updateDIV("uiBase", "height", "");
+    }
+}

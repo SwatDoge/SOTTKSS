@@ -1,0 +1,56 @@
+obj config = {
+	
+};
+
+obj client = {
+	players: obj[]
+};
+
+# Player utils
+num action player_index_by_id(obj[] player_array, str player_id) {
+	
+	num lengthof_playerarray = lengthOf player_array;
+	for (num i = 0; i < lengthof_playerarray; i++){
+		if ((str) player_array[i].id == player_id){
+			return i;
+		}
+	}
+	return -1;
+}
+
+obj action get_self(obj[] player_array){
+	num lengthof_playerarray = lengthOf player_array;
+	for (num i = 0; i < lengthof_playerarray; i++){
+		if ((bool) player_array[i].isYou){
+			return player_array[i];
+		}
+	}
+	return {};
+}
+
+# Official hooks
+
+public action start() {
+
+}
+
+public action update(num delta) {
+	
+}
+
+public action onPlayerSpawn(str id) {
+	num player_index = player_index_by_id((obj[]) client.players, id);
+
+	if (player_index == -1){
+		GAME.NETWORK.broadcast("user_join", {pid: client.players[player_index].id, rn: client.players[player_index].accountName});
+		
+		obj player = GAME.PLAYERS.findByID(id);
+		addTo (obj[]) client.players player;
+	}
+}
+
+public action onPlayerLeave(str playerID) {
+	num player_index = player_index_by_id((obj[]) client.players, playerID);
+	GAME.NETWORK.broadcast("user_left", {pid: client.players[player_index].id});
+	remove client.players[player_index];
+}

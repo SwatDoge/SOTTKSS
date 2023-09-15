@@ -1,0 +1,359 @@
+obj config = {
+	spin_time: 2000,
+	speed_ability_boost: 1.05,
+	speed_ability_boost_midair: 0.00000047,
+	abilities: obj[
+		# at least 1 ability
+		# atleast 1 ability with a cooldown of 0
+		# cooldowns reset every round
+  		{name: "ability_speed", 	display_name: "Mushroom", 			amount: 1, duration: 4000, rarity: 20, cooldown: 0},
+		{name: "ability_speed_x2", 	display_name: "Double Mushroom", 	amount: 1, duration: 4000, rarity: 15, cooldown: 0},
+ 		{name: "ability_speed_x3", 	display_name: "Triple Mushroom", 	amount: 3, duration: 4000, rarity: 10, cooldown: 0}
+#  		{name: "ability_banana", 	display_name: "Banana", 			amount: 1, duration: 0, rarity: 20, cooldown: 0},
+#  		{name: "ability_banana_x2", display_name: "Double Banana", 		amount: 2, duration: 0, rarity: 15, cooldown: 0},
+#  		{name: "ability_banana_x3", display_name: "Triple Banana", 		amount: 3, duration: 0, rarity: 10, cooldown: 0},
+# 		{name: "ability_inc", 		display_name: "Inc", 				amount: 1, duration: 5000, rarity: 20, cooldown: 0},
+# 		{name: "ability_lightning", display_name: "Thunder cloud", 		amount: 1, duration: 3000, rarity: 20, cooldown: 45000},
+#  		{name: "ability_star", 		display_name: "Star", 				amount: 1, duration: 16000, rarity: 20, cooldown: 0}
+	]
+};
+
+obj client = {
+	ability_objects: obj[],
+	total_rarity: 0,
+	objects: obj[],
+	players: obj[
+		# 	ability: {
+		# 		name: "none",
+		# 		display_name: "none",
+		# 		active: false,
+		# 		active_duration: 0,
+		# 		ability_duration: 0,
+		# 		amount: 0
+		# 	},
+		#	{
+		#		ability_id: {},
+		#		spin_started: GAME.TIME.now()
+		#	}
+	],
+	abilities_cooldown: obj[
+		#	{
+		#		ability_id: -1
+		#		last_used: GAME.TIME.now()
+		#	}
+	]
+};
+
+# utils
+obj action get_ability_by_id(num id) {
+	return (obj) config.abilities[id];
+}
+
+num action ability_index_by_name(str name) {
+	num lengthof_abilities = lengthOf config.abilities;
+	for (num i = 0; i < lengthof_abilities; i++){
+		if ((str) config.abilities[i].name == name){
+			return i;
+		}
+	}
+	return -1;
+}
+
+num action player_index_by_id(obj[] player_array, str player_id) {
+	num lengthof_playerarray = lengthOf player_array;
+	for (num i = 0; i < lengthof_playerarray; i++){
+		if ((str) player_array[i].id == player_id){
+			return i;
+		}
+	}
+	return -1;
+}
+
+# spins = exception
+action reset_spin(obj player) {
+	player.spin = {
+		ability_id: -1,
+		spin_started: 0
+	};
+}
+
+# abilities
+bool action allow_use_ability(obj player) {
+	return ((num) player.ability.amount > 0 && (str) player.ability.name != "none" && (bool) player.active && (num) player.spin.spin_started + (num) config.spin_time < GAME.TIME.now());
+}
+
+obj action get_abilities_cooldown(num ability_id) {
+	num lengthof_cooldown = lengthOf client.abilities_cooldown;
+	for (num i = 0; i < lengthof_cooldown; i++) {
+		if ((num) client.abilities_cooldown[i].ability_id == ability_id) {
+			return (obj) client.abilities_cooldown[i];
+		}
+	}
+	return {};
+}
+
+action add_abilities_cooldown(num ability_id) {
+	num lengthof_cooldown = lengthOf client.abilities_cooldown;
+	bool is_available = true;
+	for (num i = 0; i < lengthof_cooldown; i++) {
+		if ((num) client.abilities_cooldown[i].ability_id == ability_id) {
+			if ((num) client.abilities_cooldown[i].last_used + (num) get_ability_by_id(ability_id).cooldown < GAME.TIME.now()) {
+				GAME.log(1);
+				remove client.abilities_cooldown[i];
+			}
+			else {
+				is_available = false;
+			}
+			
+			break;
+		}
+	}
+
+	if (is_available) {
+		addTo (obj[]) client.abilities_cooldown {
+			ability_id: ability_id,
+			last_used: GAME.TIME.now()
+		};
+	}
+}
+
+action reset_ability(obj player) {
+	player.ability = {
+		name: "none",
+		display_name: "none",
+		active: false,
+		active_duration: 0,
+		ability_duration: 0,
+		amount: 0
+	};
+}
+
+action set_ability(obj player, obj ability) {
+	player.ability = {
+		name: ability.name,
+		display_name: ability.display_name,
+		active: false,
+		active_duration: 0,
+		ability_duration: ability.duration,
+		amount: ability.amount
+	};
+}
+
+action end_ability(obj player) {
+	GAME.log("End ability " + (str) player.ability.name + " of player " + (str) player.username);
+}
+
+action start_ability(obj player) {
+	GAME.log("Starting ability " + (str) player.ability.name + " of player " + (str) player.username);
+
+	if ((str) player.ability.name == "ability_banana" || (str) player.ability.name == "ability_banana_x3") {
+		num lengthof_objects = lengthOf client.objects;
+	}
+	
+	if ((str) player.ability.name == "ability_lightning") {
+		num lengthof_players = lengthOf client.players;
+		for (num i = 0; i < lengthof_players; i++) {
+			if ((str) player.id != (str) client.players[i].id) {
+				reset_spin((obj) client.players[i]);
+				reset_ability((obj) client.players[i]);
+			}
+		}
+	}
+}
+
+action while_ability(num delta, obj player) {
+	GAME.log("While ability " + (str) player.ability.name + " of player " + (str) player.username);
+	
+	if ((str) player.ability.name == "ability_lightning") {
+		num lengthof_players = lengthOf client.players;
+		for (num i = 0; i < lengthof_players; i++) {
+			if ((str) player.id != (str) client.players[i].id) {
+				client.players[i].onGround = false;
+			}
+		}
+		return;
+	}
+}
+
+action update_ability(obj player, str type, num delta) {
+	if (type == "while") {
+		(num) player.ability.active_duration += delta;
+		while_ability(delta, player);
+		return;
+	}
+	else if (type == "start") {
+		player.ability.active = true;
+		player.ability.active_duration = 0;
+		(num) player.ability.amount--;
+		
+		start_ability(player);
+	}
+	else if (type == "end") {
+		end_ability(player);
+
+		player.ability.active = false;
+		if ((num) player.ability.amount < 1) {
+			reset_ability(player);
+		}
+	}
+}
+
+# spins
+action generate_spin(obj player) {
+	num random_ability_id = -1;
+	num lengthof_abilities = lengthOf config.abilities;
+	num lengthof_cooldowns = lengthOf client.abilities_cooldown;
+	bool available_random_ability = false;
+
+	#tries
+	for (num max_tries = 10000; max_tries >= 0; max_tries--) {
+		
+		num rarirty = UTILS.randInt(0, (num) client.total_rarity);
+		num rarity_index = 0;
+		#rarities
+		for (num i = 0; i < lengthof_abilities; i++) {
+			rarity_index += (num) config.abilities[i].rarity;
+			if (rarity_index >= rarirty) {
+				# cooldown
+				obj cooldown = get_abilities_cooldown(i);
+				if (!notEmpty cooldown) {
+					random_ability_id = i;
+					available_random_ability = true;
+					break;
+				}
+				
+				if ((num) cooldown.last_used + (num) config.abilities[i].cooldown < GAME.TIME.now()) {
+					random_ability_id = i;
+					available_random_ability = true;
+					break;
+				}
+				else {
+					break;
+				}
+			}
+		}
+		if (available_random_ability) {
+			break;
+		}
+	}
+
+	GAME.NETWORK.send("start_spin", {ab: random_ability_id}, player.id);
+	add_abilities_cooldown(random_ability_id);
+	player.spin = {
+		ability_id: random_ability_id,
+		spin_started: GAME.TIME.now()
+	}; 
+}
+
+num update_delta = GAME.TIME.now();
+public action update(num delta) {
+	num real_delta = GAME.TIME.now() - update_delta;
+	update_delta = GAME.TIME.now();
+
+	num lengthof_players = lengthOf client.players;
+	for (num i = 0; i < lengthof_players; i++) {
+		if ((num) client.players[i].spin.spin_started + (num) config.spin_time < GAME.TIME.now() && (num) client.players[i].spin.ability_id != -1) {
+			set_ability((obj) client.players[i], get_ability_by_id((num) client.players[i].spin.ability_id));
+			reset_spin((obj) client.players[i]);
+		}
+		if ((bool) client.players[i].ability.active){
+			str state = (num) client.players[i].ability.active_duration < (num) client.players[i].ability.ability_duration ? "while" : "end";
+			update_ability((obj) client.players[i], state, real_delta);			
+		}
+	}
+}
+
+# box
+bool action allow_use_box(obj player){
+	return (str) player.ability.name == "none" && (num) player.spin.spin_started + (num) config.spin_time < GAME.TIME.now();
+}
+
+public action onNetworkMessage(str id, obj data, str playerID) {
+	GAME.log(id, data, playerID);
+	num player_index = player_index_by_id((obj[]) client.players, playerID);
+	obj player = (obj) client.players[player_index];
+
+	if (id == "trigger_ability" && allow_use_ability(player)) {
+		update_ability(player, "start", 0);
+		GAME.NETWORK.broadcast("trigger_ability", {pid: player.id, ab: ability_index_by_name((str) player.ability.name)});
+	}
+}
+
+# official hooks
+public action onCustomTrigger(str playerID, str customParam, num value) {
+	num player_index = player_index_by_id((obj[]) client.players, playerID);
+	obj player = (obj) client.players[player_index];
+
+	if (customParam == "luckybox" && allow_use_box(player)) {
+		GAME.log("trigger");
+		generate_spin(player);
+	}
+}
+
+public action onPlayerUpdate(str id, num delta, obj inputs) {
+	if ((bool) inputs.restK){
+		GAME.log(client.players);
+	}
+
+	num player_index = player_index_by_id((obj[]) client.players, id);
+	obj player = (obj) client.players[player_index];
+
+	player.registerSyncValues("ability");
+
+	if((num) inputs.movDir < 0 && ((str) player.ability.name == "ability_speed" || (str) player.ability.name == "ability_speed_x2" || (str) player.ability.name == "ability_speed_x3" || (str) player.ability.name == "ability_star") && (bool) player.ability.active) {
+		num speed = (num) config.speed_ability_boost;
+		if (!(bool) player.onGround) {
+			num speed = (num) config.speed_ability_boost_midair;
+		}
+		(num) player.velocity.x *= speed;
+		(num) player.velocity.z *= speed;
+	}
+}
+
+public action onGameEnd() {
+   	client.players = obj[];
+	client.abilities_cooldown = obj[];
+	client.ability_objects = {
+		bananas: obj[]
+	};
+}
+
+public action onPlayerDeath(str id, str killerID) {
+	num player_index = player_index_by_id((obj[]) client.players, id);
+	obj player = (obj) client.players[player_index];
+	update_ability(player, "end", 0);
+
+	reset_spin(player);
+	reset_ability(player);
+}
+
+public action start(){
+	client.objects = GAME.OBJECTS.list();
+
+	num total_rarity = 0;
+	num lengthof_abilities = lengthOf config.abilities;
+	for (num i = 0; i < lengthof_abilities; i++) {
+		total_rarity += (num) config.abilities[i].rarity;
+	}
+	client.total_rarity = total_rarity;
+}
+
+public action onPlayerSpawn(str id) {
+	num player_index = player_index_by_id((obj[]) client.players, id);
+
+	if (player_index == -1){
+		obj player = GAME.PLAYERS.findByID(id);
+		reset_ability(player);
+		reset_spin(player);
+		addTo (obj[]) client.players player;
+	}
+}
+
+public action onPlayerLeave(str playerID) {
+	num player_index = player_index_by_id((obj[]) client.players, playerID);
+
+	update_ability((obj) client.players[player_index], "end", 0);
+
+	GAME.NETWORK.broadcast("user_left", {pid: client.players[player_index].id});
+	remove client.players[player_index];
+}
